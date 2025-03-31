@@ -32,5 +32,18 @@ public class UserAddRequest implements Serializable {
      */
     private String userRole;
 
+    /**
+     * 用户密码
+     */
+    private String userPassword;
+    /**
+     * 确认密码
+     */
+    private String checkPassword;
+    /**
+     * 用户简介
+     */
+    private String userProfile;
+
     private static final long serialVersionUID = 1L;
 }

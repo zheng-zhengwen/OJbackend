@@ -50,39 +50,109 @@ public class FileController {
      */
     @PostMapping("/upload")
     public BaseResponse<String> uploadFile(@RequestPart("file") MultipartFile multipartFile,
-            UploadFileRequest uploadFileRequest, HttpServletRequest request) {
-        String biz = uploadFileRequest.getBiz();
-        FileUploadBizEnum fileUploadBizEnum = FileUploadBizEnum.getEnumByValue(biz);
-        if (fileUploadBizEnum == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        validFile(multipartFile, fileUploadBizEnum);
-        User loginUser = userService.getLoginUser(request);
-        // 文件目录：根据业务、用户来划分
-        String uuid = RandomStringUtils.randomAlphanumeric(8);
-        String filename = uuid + "-" + multipartFile.getOriginalFilename();
-        String filepath = String.format("/%s/%s/%s", fileUploadBizEnum.getValue(), loginUser.getId(), filename);
-        File file = null;
+                                           UploadFileRequest uploadFileRequest, HttpServletRequest request) {
         try {
-            // 上传文件
-            file = File.createTempFile(filepath, null);
-            multipartFile.transferTo(file);
-            cosManager.putObject(filepath, file);
-            // 返回可访问地址
-            return ResultUtils.success(FileConstant.COS_HOST + filepath);
-        } catch (Exception e) {
-            log.error("file upload error, filepath = " + filepath, e);
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
-        } finally {
-            if (file != null) {
-                // 删除临时文件
-                boolean delete = file.delete();
-                if (!delete) {
-                    log.error("file delete error, filepath = {}", filepath);
+            // 接收请求
+            String biz = uploadFileRequest.getBiz();
+            System.out.println("接收到文件上传请求，业务类型为: " + biz);
+
+            // 验证业务类型
+            FileUploadBizEnum fileUploadBizEnum = FileUploadBizEnum.getEnumByValue(biz);
+            if (fileUploadBizEnum == null) {
+                System.out.println("业务类型参数错误，biz = " + biz);
+                throw new BusinessException(ErrorCode.PARAMS_ERROR);
+            }
+            System.out.println("业务类型验证通过，业务类型为: " + fileUploadBizEnum.getText());
+
+            // 验证文件
+            validFile(multipartFile, fileUploadBizEnum);
+            System.out.println("文件验证通过");
+
+            // 获取登录用户信息
+            User loginUser = userService.getLoginUser(request);
+            System.out.println("获取到登录用户信息，用户ID为: " + loginUser.getId());
+
+            // 生成文件存储路径
+            String uuid = RandomStringUtils.randomAlphanumeric(8);
+            String filename = uuid + "-" + multipartFile.getOriginalFilename();
+            String filepath = String.format("/%s/%s/%s", fileUploadBizEnum.getValue(), loginUser.getId(), filename);
+            System.out.println("生成文件存储路径: " + filepath);
+
+            File file = null;
+            try {
+                // 创建临时文件
+                file = File.createTempFile(filepath, null);
+                System.out.println("创建临时文件: " + file.getAbsolutePath());
+
+                // 转移文件内容
+                multipartFile.transferTo(file);
+                System.out.println("文件内容已转移到临时文件");
+
+                // 上传文件到对象存储
+                cosManager.putObject(filepath, file);
+                System.out.println("文件已成功上传到对象存储，路径为: " + filepath);
+
+                // 返回可访问地址
+                String accessUrl = FileConstant.COS_HOST + filepath;
+                System.out.println("文件可访问地址为: " + accessUrl);
+                return ResultUtils.success(accessUrl);
+            } catch (Exception e) {
+                System.out.println("文件上传过程中出现错误，文件路径 = " + filepath + ", 错误信息: " + e.getMessage());
+                throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
+            } finally {
+                if (file != null) {
+                    // 删除临时文件
+                    boolean delete = file.delete();
+                    if (delete) {
+                        System.out.println("临时文件已成功删除，文件路径 = " + file.getAbsolutePath());
+                    } else {
+                        System.out.println("临时文件删除失败，文件路径 = " + file.getAbsolutePath());
+                    }
                 }
             }
+        } catch (BusinessException e) {
+            System.out.println("业务异常: " + e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            System.out.println("未知异常: " + e.getMessage());
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
         }
     }
+//    public BaseResponse<String> uploadFile(@RequestPart("file") MultipartFile multipartFile,
+//            UploadFileRequest uploadFileRequest, HttpServletRequest request) {
+//        String biz = uploadFileRequest.getBiz();
+//        FileUploadBizEnum fileUploadBizEnum = FileUploadBizEnum.getEnumByValue(biz);
+//        if (fileUploadBizEnum == null) {
+//            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+//        }
+//        validFile(multipartFile, fileUploadBizEnum);
+//        User loginUser = userService.getLoginUser(request);
+//        // 文件目录：根据业务、用户来划分
+//        String uuid = RandomStringUtils.randomAlphanumeric(8);
+//        String filename = uuid + "-" + multipartFile.getOriginalFilename();
+//        String filepath = String.format("/%s/%s/%s", fileUploadBizEnum.getValue(), loginUser.getId(), filename);
+//        System.out.println("上传头像："+filepath);
+//        File file = null;
+//        try {
+//            // 上传文件
+//            file = File.createTempFile(filepath, null);
+//            multipartFile.transferTo(file);
+//            cosManager.putObject(filepath, file);
+//            // 返回可访问地址
+//            return ResultUtils.success(FileConstant.COS_HOST + filepath);
+//        } catch (Exception e) {
+//            log.error("file upload error, filepath = " + filepath, e);
+//            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "上传失败");
+//        } finally {
+//            if (file != null) {
+//                // 删除临时文件
+//                boolean delete = file.delete();
+//                if (!delete) {
+//                    log.error("file delete error, filepath = {}", filepath);
+//                }
+//            }
+//        }
+//    }
 
     /**
      * 校验文件

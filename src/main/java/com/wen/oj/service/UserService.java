@@ -2,7 +2,9 @@ package com.wen.oj.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.wen.oj.model.dto.user.UserAddRequest;
 import com.wen.oj.model.dto.user.UserQueryRequest;
+import com.wen.oj.model.dto.user.UserUpdateRequest;
 import com.wen.oj.model.entity.User;
 import com.wen.oj.model.vo.LoginUserVO;
 import com.wen.oj.model.vo.UserVO;
@@ -27,6 +29,20 @@ public interface UserService extends IService<User> {
      * @return 新用户 id
      */
     long userRegister(String userAccount, String userPassword, String checkPassword);
+    /**
+     * 添加用户
+     *
+     * @param userAddRequest   用户添加DTO
+     * @return 新用户 id
+     */
+    long userAdd(UserAddRequest userAddRequest);
+    /**
+     * 修改用户
+     *
+     * @param userUpdateRequest   用户修改DTO
+     * @return 用户 id
+     */
+    boolean userUpdate(UserUpdateRequest userUpdateRequest);
 
     /**
      * 用户登录

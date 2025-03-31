@@ -30,5 +30,10 @@ public interface UserConstant {
      */
     String BAN_ROLE = "ban";
 
+    String DEFAULT_AVATAR = "https://q1.itc.cn/q_70/images03/20240414/d477378709494a9e8adf154fb5200feb.jpeg";
+//    String DEFAULT_AVATAR="https://pic.cnblogs.com/avatar/3210868/20230531015907.png";
+
+    String DEFAULT_INTRODUCE = "这个人很懒，什么都没有留下";
+
     // endregion
 }

@@ -2,8 +2,7 @@ package com.wen.oj.model.vo;
 
 
 import cn.hutool.json.JSONUtil;
-import com.wen.oj.model.dto.questionsubmit.JudgeInfo;
-import com.wen.oj.model.entity.Question;
+import com.wen.oj.judge.codesandbox.model.JudgeInfo;
 import com.wen.oj.model.entity.QuestionSubmit;
 import lombok.Data;
 import org.springframework.beans.BeanUtils;

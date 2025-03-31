@@ -32,8 +32,9 @@ import javax.servlet.http.HttpServletRequest;
  * @from <a href="https://wen.icu">在线编程系统</a>
  */
 @RestController
-@RequestMapping("/question_submit")
+//@RequestMapping("/question_submit")
 @Slf4j
+@Deprecated
 public class QuestionSubmitController {
 
     @Resource
@@ -42,44 +43,44 @@ public class QuestionSubmitController {
     @Resource
     private UserService userService;
 
-    /**
-     * 提交题目
-     *
-     * @param questionSubmitAddRequest
-     * @param request
-     * @return resultNum 提交记录id
-     */
-    @PostMapping("/")
-    public BaseResponse<Long> doQuestionSubmit(@RequestBody QuestionSubmitAddRequest questionSubmitAddRequest,
-                                               HttpServletRequest request) {
-        if (questionSubmitAddRequest == null || questionSubmitAddRequest.getQuestionId() <= 0) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        // 登录才能点赞
-        final User loginUser = userService.getLoginUser(request);
-        //long questionId = questionSubmitAddRequest.getQuestionId();
-        long result = questionSumitService.doQuestionSubmit(questionSubmitAddRequest, loginUser);
-        return ResultUtils.success(result);
-    }
-
-    /**
-     * 分页获取题目提交列表（仅管理员，普通用户只能看到给答案，提交代码等公开信息）【不脱敏】
-     *
-     * @param questionSubmitQueryRequest
-     * @param request
-     */
-    @PostMapping("/list/page")
-    public BaseResponse<Page<QuestionSubmitVO>> listQuestionSubmitByPage(@RequestBody QuestionSubmitQueryRequest questionSubmitQueryRequest,
-                                                                         HttpServletRequest request)  {
-        long current =  questionSubmitQueryRequest.getCurrent();
-        long size = questionSubmitQueryRequest.getPageSize();
-        //从数据库中查询原始的题目提交给分页信息
-        Page<QuestionSubmit> questionSubmitPage = questionSumitService.page(new Page<>(current, size),
-                questionSumitService.getQueryWrapper(questionSubmitQueryRequest));
-        final User loginUser = userService.getLoginUser(request);
-        //返回脱敏信息
-        return ResultUtils.success(questionSumitService.getQuestionSubmitVOPage(questionSubmitPage,loginUser));
-    }
+//    /**
+//     * 提交题目
+//     *
+//     * @param questionSubmitAddRequest
+//     * @param request
+//     * @return resultNum 提交记录id
+//     */
+//    @PostMapping("/")
+//    public BaseResponse<Long> doQuestionSubmit(@RequestBody QuestionSubmitAddRequest questionSubmitAddRequest,
+//                                               HttpServletRequest request) {
+//        if (questionSubmitAddRequest == null || questionSubmitAddRequest.getQuestionId() <= 0) {
+//            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+//        }
+//        // 登录才能点赞
+//        final User loginUser = userService.getLoginUser(request);
+//        //long questionId = questionSubmitAddRequest.getQuestionId();
+//        long result = questionSumitService.doQuestionSubmit(questionSubmitAddRequest, loginUser);
+//        return ResultUtils.success(result);
+//    }
+//
+//    /**
+//     * 分页获取题目提交列表（仅管理员，普通用户只能看到给答案，提交代码等公开信息）【不脱敏】
+//     *
+//     * @param questionSubmitQueryRequest
+//     * @param request
+//     */
+//    @PostMapping("/list/page")
+//    public BaseResponse<Page<QuestionSubmitVO>> listQuestionSubmitByPage(@RequestBody QuestionSubmitQueryRequest questionSubmitQueryRequest,
+//                                                                         HttpServletRequest request)  {
+//        long current =  questionSubmitQueryRequest.getCurrent();
+//        long size = questionSubmitQueryRequest.getPageSize();
+//        //从数据库中查询原始的题目提交给分页信息
+//        Page<QuestionSubmit> questionSubmitPage = questionSumitService.page(new Page<>(current, size),
+//                questionSumitService.getQueryWrapper(questionSubmitQueryRequest));
+//        final User loginUser = userService.getLoginUser(request);
+//        //返回脱敏信息
+//        return ResultUtils.success(questionSumitService.getQuestionSubmitVOPage(questionSubmitPage,loginUser));
+//    }
 
 
 }

@@ -12,17 +12,17 @@ import java.util.stream.Collectors;
  * @author <a href="https://github.com/zheng-zhengwen">程序员阿文</a>
  * @from <a href="https://wen.icu">在线编程系统</a>
  */
-public enum QuestionSubmidLanguageEnum {
+public enum QuestionsSubmitLanguageEnum {
 
     JAVA("java", "java"),
-    CPLUSPLUS("c++", "c++"),
-    GOLANG("golang", "golang");
+    CPLUSPLUS("cpp", "cpp"),
+    GOLANG("go", "go");
 
     private final String text;
 
     private final String value;
 
-    QuestionSubmidLanguageEnum(String text, String value) {
+    QuestionsSubmitLanguageEnum(String text, String value) {
         this.text = text;
         this.value = value;
     }
@@ -42,11 +42,11 @@ public enum QuestionSubmidLanguageEnum {
      * @param value
      * @return
      */
-    public static QuestionSubmidLanguageEnum getEnumByValue(String value) {
+    public static QuestionsSubmitLanguageEnum getEnumByValue(String value) {
         if (ObjectUtils.isEmpty(value)) {
             return null;
         }
-        for (QuestionSubmidLanguageEnum anEnum : QuestionSubmidLanguageEnum.values()) {
+        for (QuestionsSubmitLanguageEnum anEnum : QuestionsSubmitLanguageEnum.values()) {
             if (anEnum.value.equals(value)) {
                 return anEnum;
             }

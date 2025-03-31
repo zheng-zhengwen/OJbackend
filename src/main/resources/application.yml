@@ -26,18 +26,18 @@ spring:
     password: root
   # Redis 配置
   # todo 需替换配置，然后取消注释
-#  redis:
-#    database: 1
-#    host: localhost
-#    port: 6379
-#    timeout: 5000
-#    password: 123456
+#    redis:
+#      database: 0
+#      host: localhost
+#      port: 6379
+#      timeout: 5000
+#      password: 123456
   # Elasticsearch 配置
   # todo 需替换配置，然后取消注释
-#  elasticsearch:
-#    uris: http://localhost:9200
-#    username: root
-#    password: 123456
+  #  elasticsearch:
+  #    uris: http://localhost:9200
+  #    username: root
+  #    password: 123456
   # 文件上传
   servlet:
     multipart:
@@ -101,3 +101,14 @@ knife4j:
         api-rule: package
         api-rule-resources:
           - com.wen.oj.controller
+# 代码沙箱配置
+codesandbox:
+  type: remote
+# AI服务配置
+ark:
+  api-key: ${ARK_API_KEY:41ac7a76-ce1e-4fb5-a372-23b9cbef5a73} # 生产环境通过环境变量注入
+  model: ${ARK_MODEL_ID:doubao-1-5-pro-4k-240425}
+  connect-timeout: 15000
+  read-timeout: 45000
+ai:
+  apiKey: 41ac7a76-ce1e-4fb5-a372-23b9cbef5a73
