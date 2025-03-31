@@ -6,33 +6,29 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wen.oj.common.ErrorCode;
 import com.wen.oj.constant.CommonConstant;
 import com.wen.oj.exception.BusinessException;
-import com.wen.oj.exception.ThrowUtils;
+import com.wen.oj.judge.JudgeService;
 import com.wen.oj.model.dto.questionsubmit.QuestionSubmitAddRequest;
 import com.wen.oj.model.dto.questionsubmit.QuestionSubmitQueryRequest;
 import com.wen.oj.model.entity.Question;
 import com.wen.oj.model.entity.QuestionSubmit;
 import com.wen.oj.model.entity.User;
-import com.wen.oj.model.enums.QuestionSubmidLanguageEnum;
+import com.wen.oj.model.enums.QuestionSubmitLanguageEnum;
 import com.wen.oj.model.enums.QuestionSubmitStatusEnum;
 import com.wen.oj.model.vo.QuestionSubmitVO;
-import com.wen.oj.model.vo.QuestionVO;
-import com.wen.oj.model.vo.UserVO;
 import com.wen.oj.service.QuestionService;
 import com.wen.oj.service.QuestionSubmitService;
 import com.wen.oj.mapper.QuestionSubmitMapper;
 import com.wen.oj.service.UserService;
 import com.wen.oj.utils.SqlUtils;
-import jdk.nashorn.internal.ir.IfNode;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
@@ -51,6 +47,10 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
     @Resource
     private UserService userService;
 
+    @Resource
+    @Lazy
+    private JudgeService judgeService;
+
     /**
      * 提交题目
      *
@@ -62,7 +62,7 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
     public long doQuestionSubmit(QuestionSubmitAddRequest questionSubmitAddRequest, User loginUser) {
         //todo 校验编程语言是否合法
         String language = questionSubmitAddRequest.getLanguage();
-        QuestionSubmidLanguageEnum languageEnum = QuestionSubmidLanguageEnum.getEnumByValue(language);
+        QuestionSubmitLanguageEnum languageEnum = QuestionSubmitLanguageEnum.getEnumByValue(language);
         if (languageEnum == null){
             throw new BusinessException(ErrorCode.PARAMS_ERROR,"编程语言不合法");
         }
@@ -88,7 +88,12 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
         if (!save) {
             throw  new BusinessException(ErrorCode.SYSTEM_ERROR,"数据插入失败");
         }
-        return questionSubmit.getId();
+        Long questionSubmitId = questionSubmit.getId();
+        //执行判题服务
+        CompletableFuture.runAsync(()->{
+            judgeService.dojudge(questionSubmitId);
+        });
+        return questionSubmitId;
     }
 
 
