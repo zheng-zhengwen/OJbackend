@@ -9,14 +9,14 @@ import java.util.stream.Collectors;
 /**
  * 题目提交编程语言枚举
  *
- * @author <a href="https://github.com/zheng-zhengwen">程序员阿文</a>
- * @from <a href="https://wen.icu">在线编程系统</a>
+ * @author
+ * @from
  */
 public enum QuestionsSubmitLanguageEnum {
 
     JAVA("java", "java"),
-    CPLUSPLUS("cpp", "cpp"),
-    GOLANG("go", "go");
+    CPLUSPLUS("cpp", "c++"),
+    GOLANG("go", "golang");
 
     private final String text;
 
