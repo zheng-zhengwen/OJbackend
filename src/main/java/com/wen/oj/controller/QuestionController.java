@@ -2,6 +2,9 @@ package com.wen.oj.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.google.gson.Gson;
+import com.wen.oj.AI.AiManager;
+import com.wen.oj.AI.AiQuestionVO;
+import com.wen.oj.AI.QuestionSubmitQueryDTO;
 import com.wen.oj.annotation.AuthCheck;
 import com.wen.oj.common.BaseResponse;
 import com.wen.oj.common.DeleteRequest;
@@ -16,6 +19,7 @@ import com.wen.oj.model.dto.questionsubmit.QuestionSubmitQueryRequest;
 import com.wen.oj.model.entity.Question;
 import com.wen.oj.model.entity.QuestionSubmit;
 import com.wen.oj.model.entity.User;
+import com.wen.oj.model.enums.QuestionsSubmitLanguageEnum;
 import com.wen.oj.model.vo.QuestionSubmitVO;
 import com.wen.oj.model.vo.QuestionVO;
 import com.wen.oj.service.QuestionService;
@@ -49,7 +53,16 @@ public class QuestionController {
     private final static Gson GSON = new Gson();
 
     @Resource
-    private QuestionSubmitService questionSumitService;
+    private QuestionSubmitService questionSubitService;
+
+    @Resource
+    private AiManager aiManager;
+
+//    @Resource
+//    private static final String CACHE_KEY_PREFIX = "question:ai:";
+
+//    @Resource
+//    private RedisTemplate<String, Object> redisTemplate;
 
     // region 增删改查
 
@@ -71,12 +84,12 @@ public class QuestionController {
         if (tags != null) {
             question.setTags(GSON.toJson(tags));
         }
-        List<JudgeCase> judgeCases =  questionAddRequest.getJudgeCase();
-        if (judgeCases != null){
+        List<JudgeCase> judgeCases = questionAddRequest.getJudgeCase();
+        if (judgeCases != null) {
             question.setJudgeCase(GSON.toJson(judgeCases));
         }
-        JudgeConfig judgeConfig =  questionAddRequest.getJudgeConfig();
-        if (judgeConfig != null){
+        JudgeConfig judgeConfig = questionAddRequest.getJudgeConfig();
+        if (judgeConfig != null) {
             question.setJudgeConfig(GSON.toJson(judgeConfig));
         }
         questionService.validQuestion(question, true);
@@ -133,12 +146,12 @@ public class QuestionController {
         if (tags != null) {
             question.setTags(GSON.toJson(tags));
         }
-        List<JudgeCase> judgeCases =  questionUpdateRequest.getJudgeCase();
-        if (judgeCases != null){
+        List<JudgeCase> judgeCases = questionUpdateRequest.getJudgeCase();
+        if (judgeCases != null) {
             question.setJudgeCase(GSON.toJson(judgeCases));
         }
-        JudgeConfig judgeConfig =  questionUpdateRequest.getJudgeConfig();
-        if (judgeConfig != null){
+        JudgeConfig judgeConfig = questionUpdateRequest.getJudgeConfig();
+        if (judgeConfig != null) {
             question.setJudgeConfig(GSON.toJson(judgeConfig));
         }
         // 参数校验
@@ -150,6 +163,7 @@ public class QuestionController {
         boolean result = questionService.updateById(question);
         return ResultUtils.success(result);
     }
+
     /**
      * 根据 id 获取
      *
@@ -167,7 +181,7 @@ public class QuestionController {
         }
         User loginUser = userService.getLoginUser(request);
         //不是本人/管理员，则脱敏
-        if( !question.getUserId().equals(loginUser.getId()) && userService.isAdmin(loginUser)){
+        if (!question.getUserId().equals(loginUser.getId()) && userService.isAdmin(loginUser)) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
         return ResultUtils.success(question);
@@ -243,7 +257,7 @@ public class QuestionController {
     @PostMapping("/list/page")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Page<Question>> listQuestionByPage(@RequestBody QuestionQueryRequest questionQueryRequest,
-                                                           HttpServletRequest request)  {
+                                                           HttpServletRequest request) {
         long current = questionQueryRequest.getCurrent();
         long size = questionQueryRequest.getPageSize();
         Page<Question> questionPage = questionService.page(new Page<>(current, size),
@@ -272,12 +286,12 @@ public class QuestionController {
         if (tags != null) {
             question.setTags(GSON.toJson(tags));
         }
-        List<JudgeCase> judgeCases =  questionEditRequest.getJudgeCase();
-        if (judgeCases != null){
+        List<JudgeCase> judgeCases = questionEditRequest.getJudgeCase();
+        if (judgeCases != null) {
             question.setJudgeCase(GSON.toJson(judgeCases));
         }
-        JudgeConfig judgeConfig =  questionEditRequest.getJudgeConfig();
-        if (judgeConfig != null){
+        JudgeConfig judgeConfig = questionEditRequest.getJudgeConfig();
+        if (judgeConfig != null) {
             question.setJudgeConfig(GSON.toJson(judgeConfig));
         }
         // 参数校验
@@ -296,8 +310,6 @@ public class QuestionController {
     }
 
 
-
-
     /**
      * 提交题目
      *
@@ -314,7 +326,7 @@ public class QuestionController {
         // 登录才能点赞
         final User loginUser = userService.getLoginUser(request);
         //long questionId = questionSubmitAddRequest.getQuestionId();
-        long result = questionSumitService.doQuestionSubmit(questionSubmitAddRequest, loginUser);
+        long result = questionSubitService.doQuestionSubmit(questionSubmitAddRequest, loginUser);
         return ResultUtils.success(result);
     }
 
@@ -322,19 +334,64 @@ public class QuestionController {
      * 分页获取题目提交列表（仅管理员，普通用户只能看到给答案，提交代码等公开信息）【不脱敏】
      *
      * @param questionSubmitQueryRequest
-     * @param request
-     * return resultNum 提交记录id
+     * @param request                    return resultNum 提交记录id
      */
     @PostMapping("/question_submit/list/page")
     public BaseResponse<Page<QuestionSubmitVO>> listQuestionSubmitByPage(@RequestBody QuestionSubmitQueryRequest questionSubmitQueryRequest,
-                                                                         HttpServletRequest request)  {
-        long current =  questionSubmitQueryRequest.getCurrent();
+                                                                         HttpServletRequest request) {
+        System.out.println("接收到的请求参数：" + questionSubmitQueryRequest);
+        long current = questionSubmitQueryRequest.getCurrent();
         long size = questionSubmitQueryRequest.getPageSize();
-        //从数据库中查询原始的题目提交给分页信息
-        Page<QuestionSubmit> questionSubmitPage = questionSumitService.page(new Page<>(current, size),
-                questionSumitService.getQueryWrapper(questionSubmitQueryRequest));
-        final User loginUser = userService.getLoginUser(request);
-        //返回脱敏信息
-        return ResultUtils.success(questionSumitService.getQuestionSubmitVOPage(questionSubmitPage,loginUser));
+        // 直接调用本地 UserService 的方法获取登录用户
+        User loginUser = userService.getLoginUser(request);
+        Page<QuestionSubmit> questionSubmitPage = questionSubitService.page(new Page<>(current, size),
+                questionSubitService.getQueryWrapper(questionSubmitQueryRequest));
+        return ResultUtils.success(questionSubitService.getQuestionSubmitVOPage(questionSubmitPage, loginUser));
+//        long current =  questionSubmitQueryRequest.getCurrent();
+//        long size = questionSubmitQueryRequest.getPageSize();
+//        //从数据库中查询原始的题目提交给分页信息
+//        Page<QuestionSubmit> questionSubmitPage = questionSumitService.page(new Page<>(current, size),
+//                questionSumitService.getQueryWrapper(questionSubmitQueryRequest));
+//        final User loginUser = userService.getLoginUser(request);
+//        //返回脱敏信息
+//        return ResultUtils.success(questionSumitService.getQuestionSubmitVOPage(questionSubmitPage,loginUser));
+    }
+
+    /**
+     * ai答题
+     */
+    @PostMapping("/question/ai")
+    public BaseResponse<AiQuestionVO> aiQuestion(@RequestBody QuestionSubmitQueryDTO questionSubmitQueryDTO, HttpServletRequest request) {
+        if (questionSubmitQueryDTO == null || questionSubmitQueryDTO.getQuestionId() <= 0) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        //如果没设编程语言，则默认设为java
+        if (questionSubmitQueryDTO.getLanguage() == null) {
+            questionSubmitQueryDTO.setLanguage(QuestionsSubmitLanguageEnum.JAVA.getValue());
+        }
+//        User loginUser = userFeignClient.getLoginUser(request);
+//        ThrowUtils.throwIf(loginUser == null, ErrorCode.NOT_LOGIN_ERROR);
+        Question question = questionService.getById(questionSubmitQueryDTO.getQuestionId());
+        if (question == null) {
+            throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
+        }
+//        //定义缓存键
+//        String cacheKey = CACHE_KEY_PREFIX + question.getId()+questionSubmitQueryDTO.getLanguage();
+//        // 尝试从Redis中获取缓存
+//        AiQuestionVO cachedAiQuestionVO = (AiQuestionVO) redisTemplate.opsForValue().get(cacheKey);
+//        if (cachedAiQuestionVO != null) {
+//            // 如果缓存存在，直接返回
+//            return ResultUtils.success(cachedAiQuestionVO);
+//        } else {
+//            // 如果缓存不存在，调用AI方法获取结果
+//            AiQuestionVO aiQuestionVO = aiManager.getGenResultByDeepSeek(question.getTitle(), question.getContent(), questionSubmitQueryDTO.getLanguage(), question.getId());
+//
+//            // 将结果存入Redis并设置过期时间为一天
+//            redisTemplate.opsForValue().set(cacheKey, aiQuestionVO, 1, TimeUnit.HOURS);
+//
+//            return ResultUtils.success(aiQuestionVO);
+//        }
+        AiQuestionVO aiQuestionVO = aiManager.getGenResultByDeepSeek(question.getTitle(), question.getContent(), questionSubmitQueryDTO.getLanguage(), question.getId());
+        return ResultUtils.success(aiQuestionVO);
     }
 }

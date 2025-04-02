@@ -9,6 +9,7 @@ import lombok.Data;
 import org.springframework.beans.BeanUtils;
 
 
+import java.io.Serializable;
 import java.util.Date;
 import java.util.List;
 
@@ -17,7 +18,7 @@ import java.util.List;
  * @TableName question
  */
 @Data
-public class QuestionVO {
+public class QuestionVO implements Serializable {
     /**
      * id
      */
@@ -37,8 +38,10 @@ public class QuestionVO {
      * 标签列表（json 数组）
      */
     private List<String> tags;
-
-
+    /**
+     * 题目答案
+     */
+    private String answer;
     /**
      * 题目提交数
      */

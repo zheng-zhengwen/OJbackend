@@ -1,6 +1,7 @@
 package com.wen.oj.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.wen.oj.AI.QuestionSubmitQueryDTO;
 import com.wen.oj.annotation.AuthCheck;
 import com.wen.oj.common.BaseResponse;
 import com.wen.oj.common.DeleteRequest;
@@ -10,18 +11,23 @@ import com.wen.oj.config.WxOpenConfig;
 import com.wen.oj.constant.UserConstant;
 import com.wen.oj.exception.BusinessException;
 import com.wen.oj.exception.ThrowUtils;
+import com.wen.oj.model.dto.questionsubmit.QuestionSubmitQueryRequest;
 import com.wen.oj.model.dto.user.UserAddRequest;
 import com.wen.oj.model.dto.user.UserLoginRequest;
 import com.wen.oj.model.dto.user.UserQueryRequest;
 import com.wen.oj.model.dto.user.UserRegisterRequest;
 import com.wen.oj.model.dto.user.UserUpdateMyRequest;
 import com.wen.oj.model.dto.user.UserUpdateRequest;
+import com.wen.oj.model.entity.Question;
+import com.wen.oj.model.entity.QuestionSubmit;
 import com.wen.oj.model.entity.User;
-import com.wen.oj.model.vo.LoginUserVO;
-import com.wen.oj.model.vo.UserVO;
+import com.wen.oj.model.vo.*;
+import com.wen.oj.service.QuestionService;
+import com.wen.oj.service.QuestionSubmitService;
 import com.wen.oj.service.UserService;
 
 import java.util.List;
+import java.util.stream.Collectors;
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -33,12 +39,7 @@ import me.chanjar.weixin.mp.api.WxMpService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.util.DigestUtils;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import static com.wen.oj.service.impl.UserServiceImpl.SALT;
 
@@ -58,6 +59,12 @@ public class UserController {
 
     @Resource
     private WxOpenConfig wxOpenConfig;
+
+    @Resource
+    private QuestionService questionService;
+
+    @Resource
+    private QuestionSubmitService questionSubmitService;
 
     // region 登录相关
 
@@ -108,7 +115,7 @@ public class UserController {
      */
     @GetMapping("/login/wx_open")
     public BaseResponse<LoginUserVO> userLoginByWxOpen(HttpServletRequest request, HttpServletResponse response,
-            @RequestParam("code") String code) {
+                                                       @RequestParam("code") String code) {
         WxOAuth2AccessToken accessToken;
         try {
             WxMpService wxService = wxOpenConfig.getWxMpService();
@@ -173,12 +180,15 @@ public class UserController {
         User user = new User();
         BeanUtils.copyProperties(userAddRequest, user);
         // 默认密码 12345678
-        String defaultPassword = "12345678";
-        String encryptPassword = DigestUtils.md5DigestAsHex((SALT + defaultPassword).getBytes());
-        user.setUserPassword(encryptPassword);
-        boolean result = userService.save(user);
-        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-        return ResultUtils.success(user.getId());
+//        String defaultPassword = "12345678";
+//        String encryptPassword = DigestUtils.md5DigestAsHex((SALT + defaultPassword).getBytes());
+//        user.setUserPassword(encryptPassword);
+//        boolean result = userService.save(user);
+//        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+//        return ResultUtils.success(user.getId());
+        // 校验参数
+        Long result = userService.userAdd(userAddRequest);
+        return ResultUtils.success(result);
     }
 
     /**
@@ -196,27 +206,6 @@ public class UserController {
         }
         boolean b = userService.removeById(deleteRequest.getId());
         return ResultUtils.success(b);
-    }
-
-    /**
-     * 更新用户
-     *
-     * @param userUpdateRequest
-     * @param request
-     * @return
-     */
-    @PostMapping("/update")
-    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
-    public BaseResponse<Boolean> updateUser(@RequestBody UserUpdateRequest userUpdateRequest,
-            HttpServletRequest request) {
-        if (userUpdateRequest == null || userUpdateRequest.getId() == null) {
-            throw new BusinessException(ErrorCode.PARAMS_ERROR);
-        }
-        User user = new User();
-        BeanUtils.copyProperties(userUpdateRequest, user);
-        boolean result = userService.updateById(user);
-        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
-        return ResultUtils.success(true);
     }
 
     /**
@@ -261,7 +250,7 @@ public class UserController {
     @PostMapping("/list/page")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Page<User>> listUserByPage(@RequestBody UserQueryRequest userQueryRequest,
-            HttpServletRequest request) {
+                                                   HttpServletRequest request) {
         long current = userQueryRequest.getCurrent();
         long size = userQueryRequest.getPageSize();
         Page<User> userPage = userService.page(new Page<>(current, size),
@@ -278,7 +267,7 @@ public class UserController {
      */
     @PostMapping("/list/page/vo")
     public BaseResponse<Page<UserVO>> listUserVOByPage(@RequestBody UserQueryRequest userQueryRequest,
-            HttpServletRequest request) {
+                                                       HttpServletRequest request) {
         if (userQueryRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -305,7 +294,7 @@ public class UserController {
      */
     @PostMapping("/update/my")
     public BaseResponse<Boolean> updateMyUser(@RequestBody UserUpdateMyRequest userUpdateMyRequest,
-            HttpServletRequest request) {
+                                              HttpServletRequest request) {
         if (userUpdateMyRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -317,4 +306,89 @@ public class UserController {
         ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
         return ResultUtils.success(true);
     }
+
+    /**
+     * 更新用户
+     *
+     * @param userUpdateRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/update")
+    @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
+    public BaseResponse<Boolean> updateUser(@RequestBody UserUpdateRequest userUpdateRequest,
+                                            HttpServletRequest request) {
+        if (userUpdateRequest == null || userUpdateRequest.getId() == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+        boolean result = userService.userUpdate(userUpdateRequest);
+        ThrowUtils.throwIf(!result, ErrorCode.OPERATION_ERROR);
+        return ResultUtils.success(true);
+    }
+
+    /**
+     * 获取当前登录用户的提交记录
+     *
+     * @param request
+     * @return
+     */
+    @GetMapping("/get/userquestion")
+    public BaseResponse<UserQuestionVO> getLoginUserQuestion(HttpServletRequest request) {
+        UserQuestionVO userQuestionVO = getUserQuestionVO(request, null);
+        return ResultUtils.success(userQuestionVO);
+    }
+
+    /**
+     * 获取当前登录用户的指定题目的提交记录
+     *
+     * @param questionId
+     * @param request
+     * @return
+     */
+    @GetMapping("/get/userquestion/{questionId}")
+    public BaseResponse<UserQuestionVO> getLoginUserQuestionByQuestionId(@PathVariable("questionId") Long questionId, HttpServletRequest request) {
+        UserQuestionVO userQuestionVO = getUserQuestionVO(request, questionId);
+        return ResultUtils.success(userQuestionVO);
+    }
+
+    private UserQuestionVO getUserQuestionVO(HttpServletRequest request, Long questionId) {
+        User user = userService.getLoginUser(request);
+        LoginUserVO loginUserVO = userService.getLoginUserVO(user);
+        UserQuestionVO userQuestionVO = new UserQuestionVO();
+        BeanUtils.copyProperties(loginUserVO, userQuestionVO);
+
+        QuestionSubmitQueryDTO questionSubmitQueryDTO = new QuestionSubmitQueryDTO();
+        questionSubmitQueryDTO.setUserId(user.getId());
+        if (questionId != null) {
+            questionSubmitQueryDTO.setQuestionId(questionId);
+        }
+
+        // 将 QuestionSubmitQueryDTO 转换为 QuestionSubmitQueryRequest
+        QuestionSubmitQueryRequest questionSubmitQueryRequest = convertToQueryRequest(questionSubmitQueryDTO);
+
+        // 直接调用本地服务方法获取题目提交记录
+        List<QuestionSubmit> questionSubmitList = questionSubmitService.list(questionSubmitService.getQueryWrapper(questionSubmitQueryRequest));
+
+        List<QuestionSubmitVO> userQuestionsList = questionSubmitList.stream()
+                .map(QuestionSubmitVO::objToVo)
+                .peek(questionSubmitVO -> {
+                    Long questionSubmitId = questionSubmitVO.getQuestionId();
+                    // 直接调用本地服务方法获取题目信息
+                    Question question = questionService.getById(questionSubmitId);
+                    QuestionVO questionVO = questionService.getQuestionVO(question, user);
+                    questionSubmitVO.setQuestionVO(questionVO);
+                })
+                .collect(Collectors.toList());
+
+        userQuestionVO.setQuestionSubmitList(userQuestionsList);
+        return userQuestionVO;
+    }
+
+    private QuestionSubmitQueryRequest convertToQueryRequest(QuestionSubmitQueryDTO queryDTO) {
+        QuestionSubmitQueryRequest queryRequest = new QuestionSubmitQueryRequest();
+        BeanUtils.copyProperties(queryDTO, queryRequest);
+        return queryRequest;
+    }
+
+
 }

@@ -4,9 +4,10 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wen.oj.model.dto.question.QuestionQueryRequest;
 import com.wen.oj.model.entity.Question;
-import com.wen.oj.model.entity.Question;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.wen.oj.model.entity.User;
 import com.wen.oj.model.vo.QuestionVO;
+import com.wen.oj.model.vo.HotQuestionVO;
 
 import javax.servlet.http.HttpServletRequest;
 
@@ -40,7 +41,13 @@ public interface QuestionService extends IService<Question> {
      * @param request
      * @return
      */
+//    QuestionVO getQuestionVO(Question question, User loginUser);
+
+//    QuestionVO getQuestionVO(Question question, HttpServletRequest request);
+
     QuestionVO getQuestionVO(Question question, HttpServletRequest request);
+
+    QuestionVO getQuestionVO(Question question, User loginUser);
 
     /**
      * 分页获取题目封装
@@ -50,4 +57,6 @@ public interface QuestionService extends IService<Question> {
      * @return
      */
     Page<QuestionVO> getQuestionVOPage(Page<Question> questionPage, HttpServletRequest request);
+
+    Page<HotQuestionVO> listHotQuestions(QuestionQueryRequest questionQueryRequest);
 }

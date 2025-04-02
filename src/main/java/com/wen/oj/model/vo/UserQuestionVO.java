@@ -1,18 +1,18 @@
-package com.wen.oj.model.dto.user;
+package com.wen.oj.model.vo;
 
-import java.io.Serializable;
 import lombok.Data;
 
+import java.util.Date;
+import java.util.List;
+
 /**
- * 用户更新请求
- *
- * @author <a href="https://github.com/zheng-zhengwen">程序员阿文</a>
- * @from <a href="https://wen.icu">在线编程系统</a>
- */
+ * @author wen
+ * @version 1.0
+ **/
 @Data
-public class UserUpdateRequest implements Serializable {
+public class UserQuestionVO {
     /**
-     * id
+     * 用户 id
      */
     private Long id;
 
@@ -27,7 +27,7 @@ public class UserUpdateRequest implements Serializable {
     private String userAvatar;
 
     /**
-     * 简介
+     * 用户简介
      */
     private String userProfile;
 
@@ -35,10 +35,16 @@ public class UserUpdateRequest implements Serializable {
      * 用户角色：user/admin/ban
      */
     private String userRole;
+
     /**
-     * 用户密码
+     * 创建时间
      */
-    private String userPassword;
+    private Date createTime;
+    /**
+     * 最近的题目提交记录
+     */
+    private List<QuestionSubmitVO > questionSubmitList;
 
     private static final long serialVersionUID = 1L;
+
 }

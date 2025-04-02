@@ -13,6 +13,7 @@ import com.wen.oj.model.dto.question.JudgeCase;
 import com.wen.oj.judge.codesandbox.model.JudgeInfo;
 import com.wen.oj.model.entity.Question;
 import com.wen.oj.model.entity.QuestionSubmit;
+import com.wen.oj.model.enums.JudgeInfoMessageEnum;
 import com.wen.oj.model.enums.QuestionSubmitStatusEnum;
 import com.wen.oj.service.QuestionService;
 import com.wen.oj.service.QuestionSubmitService;
@@ -78,24 +79,39 @@ class JudgeServiceImpl implements JudgeService {
         ExecuteCodeResponse executeCodeResponse = codeSandbox.executeCode(executeCodeRequest);
         List<String> outputList = executeCodeResponse.getOutputList();
         //根据沙箱的执行结果，设置题目的判题状态和信息
-        JudgeContext judgeContext=new JudgeContext();
+        JudgeContext judgeContext = new JudgeContext();
         judgeContext.setJudgeInfo(executeCodeResponse.getJudgeInfo());
         judgeContext.setInputList(inputList);
         judgeContext.setOutputList(outputList);
         judgeContext.setJudgeCaseList(judgeCaseList);
         judgeContext.setQuestion(question);
         judgeContext.setQuestionSubmit(questionSubmit);
+
         JudgeInfo judgeInfo = judgeManager.doJudge(judgeContext);
-        //修改数据库中的判题结果
+        // 修改数据库中的判题结果
         questionSubmitUpdate = new QuestionSubmit();
         questionSubmitUpdate.setId(questionSubmitId);
-        questionSubmitUpdate.setStatus(QuestionSubmitStatusEnum.SUCCEED.getValue());
+        // 使用枚举判断判题结果
+        if (JudgeInfoMessageEnum.ACCEPTED.getValue().equals(judgeInfo.getMessage())) {
+            questionSubmitUpdate.setStatus(QuestionSubmitStatusEnum.SUCCEED.getValue());
+            // 通过数加1
+            question.setAcceptedNum(question.getAcceptedNum() + 1);
+        } else {
+            questionSubmitUpdate.setStatus(QuestionSubmitStatusEnum.FAILED.getValue());
+        }
+        // 提交数加1
+        question.setSubmitNum(question.getSubmitNum() + 1);
+        // 更新题目信息
+        boolean questionUpdate = questionService.updateById(question);
+        if (!questionUpdate) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "题目信息更新错误");
+        }
         questionSubmitUpdate.setJudgeInfo(JSONUtil.toJsonStr(judgeInfo));
         update = questionSubmitService.updateById(questionSubmitUpdate);
         if (!update) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "题目状态更新错误");
         }
-        QuestionSubmit questionSubmitResult = questionSubmitService.getById(questionId);
+        QuestionSubmit questionSubmitResult = questionSubmitService.getById(questionSubmitId);
         return questionSubmitResult;
     }
 }

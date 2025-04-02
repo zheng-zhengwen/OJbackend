@@ -7,14 +7,18 @@ import com.wen.oj.common.ErrorCode;
 import com.wen.oj.constant.CommonConstant;
 import com.wen.oj.exception.BusinessException;
 import com.wen.oj.judge.JudgeService;
+import com.wen.oj.mapper.QuestionMapper;
+import com.wen.oj.mapper.UserMapper;
 import com.wen.oj.model.dto.questionsubmit.QuestionSubmitAddRequest;
 import com.wen.oj.model.dto.questionsubmit.QuestionSubmitQueryRequest;
 import com.wen.oj.model.entity.Question;
 import com.wen.oj.model.entity.QuestionSubmit;
 import com.wen.oj.model.entity.User;
-import com.wen.oj.model.enums.QuestionSubmitLanguageEnum;
+import com.wen.oj.model.enums.QuestionsSubmitLanguageEnum;
 import com.wen.oj.model.enums.QuestionSubmitStatusEnum;
 import com.wen.oj.model.vo.QuestionSubmitVO;
+import com.wen.oj.model.vo.QuestionVO;
+import com.wen.oj.model.vo.UserVO;
 import com.wen.oj.service.QuestionService;
 import com.wen.oj.service.QuestionSubmitService;
 import com.wen.oj.mapper.QuestionSubmitMapper;
@@ -23,22 +27,26 @@ import com.wen.oj.utils.SqlUtils;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 /**
-* @author W
-* @description 针对表【question_submit(题目提交)】的数据库操作Service实现
-* @createDate 2025-03-19 19:20:21
-*/
+ * @author W
+ * @description 针对表【question_submit(题目提交)】的数据库操作Service实现
+ * @createDate 2025-03-19 19:20:21
+ */
 @Service
 public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper, QuestionSubmit>
-        implements QuestionSubmitService{
+        implements QuestionSubmitService {
 
 
     @Resource
@@ -46,6 +54,12 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
 
     @Resource
     private UserService userService;
+
+    @Resource
+    private QuestionMapper questionMapper;
+
+    @Resource
+    private UserMapper userMapper; // 新增 UserMapper 依赖
 
     @Resource
     @Lazy
@@ -62,9 +76,9 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
     public long doQuestionSubmit(QuestionSubmitAddRequest questionSubmitAddRequest, User loginUser) {
         //todo 校验编程语言是否合法
         String language = questionSubmitAddRequest.getLanguage();
-        QuestionSubmitLanguageEnum languageEnum = QuestionSubmitLanguageEnum.getEnumByValue(language);
-        if (languageEnum == null){
-            throw new BusinessException(ErrorCode.PARAMS_ERROR,"编程语言不合法");
+        QuestionsSubmitLanguageEnum languageEnum = QuestionsSubmitLanguageEnum.getEnumByValue(language);
+        if (languageEnum == null) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "编程语言不合法");
         }
         //获取题目id
         long questionId = questionSubmitAddRequest.getQuestionId();
@@ -84,13 +98,13 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
         //todo 设置初始状态
         questionSubmit.setStatus(QuestionSubmitStatusEnum.WAITING.getValue());
         questionSubmit.setJudgeInfo("{}");
-        boolean save =  this.save(questionSubmit);
+        boolean save = this.save(questionSubmit);
         if (!save) {
-            throw  new BusinessException(ErrorCode.SYSTEM_ERROR,"数据插入失败");
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "数据插入失败");
         }
         Long questionSubmitId = questionSubmit.getId();
         //执行判题服务
-        CompletableFuture.runAsync(()->{
+        CompletableFuture.runAsync(() -> {
             judgeService.dojudge(questionSubmitId);
         });
         return questionSubmitId;
@@ -135,15 +149,50 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
      * @return
      */
     @Override
-    public QuestionSubmitVO getQuestionSubmitVO(QuestionSubmit questionSubmit, User loginUser)  {
+    public QuestionSubmitVO getQuestionSubmitVO(QuestionSubmit questionSubmit, User loginUser) {
         QuestionSubmitVO questionSubmitVO = QuestionSubmitVO.objToVo(questionSubmit);
         //脱敏：仅管理员和本用户能看到自己（提交userId 和 登录用户 id 不同）提交代码）
-        long userId = loginUser.getId();
-        //处理脱敏
-        if (userId != questionSubmit.getUserId() && !userService.isAdmin(loginUser)) {
+//        long userId = loginUser.getId();
+//        //处理脱敏
+//        if (userId != questionSubmit.getUserId() && !userService.isAdmin(loginUser)) {
+//            questionSubmitVO.setCode(null);
+//        }
+//        return questionSubmitVO;
+        // 只有本人和管理员才能看见提交的代码
+        Long userId1 = loginUser.getId();
+        // 1. 关联查询用户信息
+        Long userId = questionSubmitVO.getUserId();
+        if (!userId1.equals(userId) && !isAdmin(loginUser)) {
             questionSubmitVO.setCode(null);
         }
+        if (userId != null && userId > 0) {
+            User user = userMapper.selectById(userId); // 直接从数据库查询用户信息
+            UserVO userVO = getUserVO(user);
+            questionSubmitVO.setUserVO(userVO);
+        }
+        // 2. 关联查询题目信息
+        Long questionId = questionSubmit.getQuestionId();
+        if (questionId != null && questionId > 0) {
+            Question question = questionService.getById(questionId);
+            QuestionVO questionVO = questionService.getQuestionVO(question, loginUser);
+            questionSubmitVO.setQuestionVO(questionVO);
+        }
         return questionSubmitVO;
+    }
+
+    // 判断是否为管理员
+    private boolean isAdmin(User user) {
+        return user != null && "ADMIN".equals(user.getUserRole()); // 假设管理员角色为 "ADMIN"
+    }
+
+    // 获取脱敏的用户信息
+    private UserVO getUserVO(User user) {
+        if (user == null) {
+            return null;
+        }
+        UserVO userVO = new UserVO();
+        BeanUtils.copyProperties(user, userVO);
+        return userVO;
     }
 
 
@@ -161,11 +210,54 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
         if (CollectionUtils.isEmpty(questionSubmitList)) {
             return questionSubmitVOPage;
         }
-        List<QuestionSubmitVO> questionSubmitVOList = questionSubmitList.stream()
-                .map(questionSubmit -> getQuestionSubmitVO(questionSubmit, loginUser))
-                .collect(Collectors.toList());
+        // 1. 关联查询用户信息
+        Set<Long> userIdSet = questionSubmitList.stream().map(QuestionSubmit::getUserId).collect(Collectors.toSet());
+        // 直接调用本地用户服务的方法获取用户列表
+        List<User> userList = userService.listByIds(new ArrayList<>(userIdSet));
+        Map<Long, List<User>> userIdUserListMap = userList.stream()
+                .collect(Collectors.groupingBy(User::getId));
+
+        // 2. 关联查询题目信息
+        Set<Long> questionIdSet = questionSubmitList.stream().map(QuestionSubmit::getQuestionId).collect(Collectors.toSet());
+        Map<Long, List<Question>> questionIdQuestionListMap = questionService.listByIds(questionIdSet).stream()
+                .collect(Collectors.groupingBy(Question::getId));
+
+        // 填充信息
+        List<QuestionSubmitVO> questionSubmitVOList = questionSubmitList.stream().map(questionSubmit -> {
+            QuestionSubmitVO questionSubmitVO = getQuestionSubmitVO(questionSubmit, loginUser);
+            Long userId = questionSubmit.getUserId();
+            User user = null;
+            if (userIdUserListMap.containsKey(userId)) {
+                user = userIdUserListMap.get(userId).get(0);
+            }
+            // 直接使用本地用户服务的方法将用户信息转换为VO
+            UserVO userVO = userService.getUserVO(user);
+            questionSubmitVO.setUserVO(userVO);
+
+            Long questionId = questionSubmit.getQuestionId();
+            Question question = null;
+            if (questionIdQuestionListMap.containsKey(questionId)) {
+                question = questionIdQuestionListMap.get(questionId).get(0);
+            }
+            questionSubmitVO.setQuestionVO(questionService.getQuestionVO(question, loginUser));
+            return questionSubmitVO;
+        }).collect(Collectors.toList());
         questionSubmitVOPage.setRecords(questionSubmitVOList);
         return questionSubmitVOPage;
+
+//        List<QuestionSubmitVO> questionSubmitVOList = questionSubmitList.stream()
+//                .map(questionSubmit -> getQuestionSubmitVO(questionSubmit, loginUser))
+//                .collect(Collectors.toList());
+//        questionSubmitVOPage.setRecords(questionSubmitVOList);
+//        return questionSubmitVOPage;
+    }
+
+    // 简单的 User 转 UserVO 方法，可根据实际情况修改
+    private UserVO convertToUserVO(User user) {
+        UserVO userVO = new UserVO();
+        // 假设 UserVO 和 User 有相同的属性名
+        BeanUtils.copyProperties(user, userVO);
+        return userVO;
     }
 
 

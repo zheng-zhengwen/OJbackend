@@ -6,17 +6,19 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.wen.oj.model.dto.questionsubmit.QuestionSubmitAddRequest;
 import com.wen.oj.model.dto.questionsubmit.QuestionSubmitQueryRequest;
+import com.wen.oj.model.entity.Question;
 import com.wen.oj.model.entity.QuestionSubmit;
 import com.wen.oj.model.entity.User;
 import com.wen.oj.model.vo.QuestionSubmitVO;
+import com.wen.oj.model.vo.QuestionVO;
 
 import javax.servlet.http.HttpServletRequest;
 
 /**
-* @author W
-* @description 针对表【question_submit(题目提交)】的数据库操作Service
-* @createDate 2025-03-19 19:20:21
-*/
+ * @author W
+ * @description 针对表【question_submit(题目提交)】的数据库操作Service
+ * @createDate 2025-03-19 19:20:21
+ */
 public interface QuestionSubmitService extends IService<QuestionSubmit> {
     /**
      * 题目提交
@@ -52,8 +54,5 @@ public interface QuestionSubmitService extends IService<QuestionSubmit> {
      * @param loginUser
      * @return
      */
-    Page<QuestionSubmitVO> getQuestionSubmitVOPage(Page<QuestionSubmit> questionSubmitPage,  User loginUser);
-
-
-
+    Page<QuestionSubmitVO> getQuestionSubmitVOPage(Page<QuestionSubmit> questionSubmitPage, User loginUser);
 }

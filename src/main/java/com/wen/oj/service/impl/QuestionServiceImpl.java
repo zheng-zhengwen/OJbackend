@@ -1,5 +1,7 @@
 package com.wen.oj.service.impl;
 
+import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -9,6 +11,7 @@ import com.wen.oj.exception.BusinessException;
 import com.wen.oj.exception.ThrowUtils;
 import com.wen.oj.model.dto.question.QuestionQueryRequest;
 import com.wen.oj.model.entity.*;
+import com.wen.oj.model.vo.HotQuestionVO;
 import com.wen.oj.model.vo.QuestionVO;
 import com.wen.oj.model.vo.UserVO;
 import com.wen.oj.service.QuestionService;
@@ -26,13 +29,13 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
-* @author W
-* @description 针对表【question(题目)】的数据库操作Service实现
-* @createDate 2025-03-19 19:17:53
-*/
+ * @author W
+ * @description 针对表【question(题目)】的数据库操作Service实现
+ * @createDate 2025-03-19 19:17:53
+ */
 @Service
 public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
-    implements QuestionService{
+        implements QuestionService {
 
 
     @Resource
@@ -40,9 +43,10 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
 
     /**
      * 校验题目是否合法
+     *
      * @param question
      * @param add
-     * */
+     */
     @Override
     public void validQuestion(Question question, boolean add) {
         if (question == null) {
@@ -78,7 +82,8 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
 
     /**
      * 获取查询包装类
-     *（用户根据哪些字段查询，根据前端传来的请求对象，得到 mybatis 框架支持的查询 QueryWraper 类）
+     * （用户根据哪些字段查询，根据前端传来的请求对象，得到 mybatis 框架支持的查询 QueryWraper 类）
+     *
      * @param questionQueryRequest
      * @return
      */
@@ -114,6 +119,11 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
         return queryWrapper;
     }
 
+//    @Override
+//    public QuestionVO getQuestionVO(Question question, User loginUser) {
+//        return null;
+//    }
+
     @Override
     public QuestionVO getQuestionVO(Question question, HttpServletRequest request) {
         QuestionVO questionVO = QuestionVO.objToVo(question);
@@ -124,6 +134,24 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
             user = userService.getById(userId);
         }
         UserVO userVO = userService.getUserVO(user);
+        questionVO.setUserVO(userVO);
+        return questionVO;
+    }
+
+    @Override
+    public QuestionVO getQuestionVO(Question question, User loginUser) {
+        if (question == null) {
+            return null;
+        }
+        QuestionVO questionVO = QuestionVO.objToVo(question);
+        // 1. 关联查询用户信息
+        Long userId = question.getUserId();
+        User user = null;
+
+        if (userId != null && userId > 0) {
+            user = userService.getById(userId); // 直接使用 UserService 获取用户信息
+        }
+        UserVO userVO = userService.getUserVO(user); // 直接使用 UserService 获取 UserVO
         questionVO.setUserVO(userVO);
         return questionVO;
     }
@@ -151,7 +179,27 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
             return questionVO;
         }).collect(Collectors.toList());
         questionVOPage.setRecords(questionVOList);
+        System.out.println("题目提交数submitNum和acceptedNum通过数：" + questionVOList);
+        System.out.println("题目提交数submitNum和acceptedNum通过数：" + questionVOPage);
         return questionVOPage;
+    }
+
+    @Override
+    public Page<HotQuestionVO> listHotQuestions(QuestionQueryRequest questionQueryRequest) {
+        LambdaQueryWrapper<Question> questionLambdaQueryWrapper = new LambdaQueryWrapper<>();
+        questionLambdaQueryWrapper.orderByDesc(Question::getAcceptedNum);
+        questionLambdaQueryWrapper.orderByAsc(Question::getSubmitNum);
+        Page<Question> hotQuestionPage = this.page(new Page<>(questionQueryRequest.getCurrent(), questionQueryRequest.getPageSize()), questionLambdaQueryWrapper);
+        List<HotQuestionVO> hotQuestionVOS = hotQuestionPage.getRecords().stream()
+                .limit(5)
+                .map(question -> {
+                    HotQuestionVO hotQuestionVO = new HotQuestionVO();
+                    hotQuestionVO.setId(question.getId());
+                    hotQuestionVO.setTitle(question.getTitle());
+                    hotQuestionVO.setTags(JSONUtil.toList(question.getTags(), String.class));
+                    return hotQuestionVO;
+                }).collect(Collectors.toList());
+        return new Page<HotQuestionVO>(hotQuestionPage.getCurrent(), hotQuestionPage.getSize(), hotQuestionPage.getTotal()).setRecords(hotQuestionVOS);
     }
 }
 
