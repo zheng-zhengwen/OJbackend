@@ -20,6 +20,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @MapperScan("com.wen.oj.mapper")
 @EnableScheduling
 @EnableAspectJAutoProxy(proxyTargetClass = true, exposeProxy = true)
+@EnableDiscoveryClient
+@EnableFeignClients(basePackages = "com.wen.oj.service.AI")
 public class MainApplication {
 
     public static void main(String[] args) {
