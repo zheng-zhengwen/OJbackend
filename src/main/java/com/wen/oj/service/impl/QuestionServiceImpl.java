@@ -201,6 +201,8 @@ public class QuestionServiceImpl extends ServiceImpl<QuestionMapper, Question>
                 }).collect(Collectors.toList());
         return new Page<HotQuestionVO>(hotQuestionPage.getCurrent(), hotQuestionPage.getSize(), hotQuestionPage.getTotal()).setRecords(hotQuestionVOS);
     }
+
+
 }
 
 

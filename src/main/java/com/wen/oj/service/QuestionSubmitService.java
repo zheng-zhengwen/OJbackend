@@ -4,15 +4,16 @@ package com.wen.oj.service;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.wen.oj.model.dto.question.QuestionQueryRequest;
 import com.wen.oj.model.dto.questionsubmit.QuestionSubmitAddRequest;
 import com.wen.oj.model.dto.questionsubmit.QuestionSubmitQueryRequest;
 import com.wen.oj.model.entity.Question;
 import com.wen.oj.model.entity.QuestionSubmit;
 import com.wen.oj.model.entity.User;
-import com.wen.oj.model.vo.QuestionSubmitVO;
-import com.wen.oj.model.vo.QuestionVO;
+import com.wen.oj.model.vo.*;
 
 import javax.servlet.http.HttpServletRequest;
+import java.util.List;
 
 /**
  * @author W
@@ -55,4 +56,12 @@ public interface QuestionSubmitService extends IService<QuestionSubmit> {
      * @return
      */
     Page<QuestionSubmitVO> getQuestionSubmitVOPage(Page<QuestionSubmit> questionSubmitPage, User loginUser);
+
+    UserStatsVO getUserStats(Long id);
+
+    List<UserLeaderboardVO> getLeaderboard();
+
+    Page<MyQuestionSubmitVO> getMyQuestionSubmitVOPage(Page<QuestionSubmit> questionSubmitPage, User loginUser);
+
+
 }

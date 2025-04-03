@@ -127,11 +127,11 @@
             <artifactId>volcengine-java-sdk-ark-runtime</artifactId>
             <version>0.2.1</version>
         </dependency>
-        <!-- Spring Boot Web -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-web</artifactId>
-        </dependency>
+<!--        &lt;!&ndash; Spring Boot Web &ndash;&gt;-->
+<!--        <dependency>-->
+<!--            <groupId>org.springframework.boot</groupId>-->
+<!--            <artifactId>spring-boot-starter-web</artifactId>-->
+<!--        </dependency>-->
         <!--修改version为最新稳定版-->
         <dependency>
             <groupId>io.github.briqt</groupId>
@@ -147,12 +147,6 @@
         <dependency>
             <groupId>org.springframework.cloud</groupId>
             <artifactId>spring-cloud-starter-openfeign</artifactId>
-        </dependency>
-        <!-- https://mvnrepository.com/artifact/com.baomidou/mybatis-plus-boot-starter -->
-        <dependency>
-            <groupId>com.baomidou</groupId>
-            <artifactId>mybatis-plus-boot-starter</artifactId>
-            <version>3.5.2</version>
         </dependency>
         <dependency>
             <groupId>org.mybatis.spring.boot</groupId>

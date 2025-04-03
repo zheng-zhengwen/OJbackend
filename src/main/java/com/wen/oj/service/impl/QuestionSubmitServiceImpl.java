@@ -1,5 +1,8 @@
 package com.wen.oj.service.impl;
 
+import cn.hutool.core.collection.CollUtil;
+import cn.hutool.json.JSONUtil;
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -9,6 +12,7 @@ import com.wen.oj.exception.BusinessException;
 import com.wen.oj.judge.JudgeService;
 import com.wen.oj.mapper.QuestionMapper;
 import com.wen.oj.mapper.UserMapper;
+import com.wen.oj.model.dto.question.QuestionQueryRequest;
 import com.wen.oj.model.dto.questionsubmit.QuestionSubmitAddRequest;
 import com.wen.oj.model.dto.questionsubmit.QuestionSubmitQueryRequest;
 import com.wen.oj.model.entity.Question;
@@ -16,9 +20,7 @@ import com.wen.oj.model.entity.QuestionSubmit;
 import com.wen.oj.model.entity.User;
 import com.wen.oj.model.enums.QuestionsSubmitLanguageEnum;
 import com.wen.oj.model.enums.QuestionSubmitStatusEnum;
-import com.wen.oj.model.vo.QuestionSubmitVO;
-import com.wen.oj.model.vo.QuestionVO;
-import com.wen.oj.model.vo.UserVO;
+import com.wen.oj.model.vo.*;
 import com.wen.oj.service.QuestionService;
 import com.wen.oj.service.QuestionSubmitService;
 import com.wen.oj.mapper.QuestionSubmitMapper;
@@ -64,6 +66,9 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
     @Resource
     @Lazy
     private JudgeService judgeService;
+
+    @Resource
+    private QuestionSubmitMapper questionSubmitMapper;
 
     /**
      * 提交题目
@@ -307,6 +312,66 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
 //            }
 //        }
 //    }
+
+    //获取用户提交数和通过数
+    @Override
+    public UserStatsVO getUserStats(Long id) {
+        UserStatsVO userStatsVO = new UserStatsVO();
+        //查询用户提交数
+        QueryWrapper<QuestionSubmit> questionSubmitLambdaQueryWrapper = new QueryWrapper<>();
+        questionSubmitLambdaQueryWrapper.eq("userId", id);
+        int submitCount = (int) this.count(questionSubmitLambdaQueryWrapper);
+        //查询用户成功提交数
+        int solvedCount = questionSubmitMapper.getSolvedCount(id);
+        //计算通过率,保留两位小数
+        double passRate = submitCount > 0 ? (double) solvedCount / submitCount * 100 : 0;
+        System.out.println("通过率：" + passRate);
+        userStatsVO.setSubmitCount(submitCount);
+        userStatsVO.setSolvedCount(solvedCount);
+        userStatsVO.setPassRate(passRate);
+        return userStatsVO;
+    }
+
+    //获取排行
+    @Override
+    public List<UserLeaderboardVO> getLeaderboard() {
+        return questionSubmitMapper.getLeaderBoard(5);
+    }
+
+    //获取用户提交记录
+    @Override
+    public Page<MyQuestionSubmitVO> getMyQuestionSubmitVOPage(Page<QuestionSubmit> questionSubmitPage, User loginUser) {
+        List<QuestionSubmit> questionSubmitList = questionSubmitPage.getRecords();
+        Page<MyQuestionSubmitVO> questionSubmitVOPage = new Page<>(questionSubmitPage.getCurrent(), questionSubmitPage.getSize(), questionSubmitPage.getTotal());
+        if (CollUtil.isEmpty(questionSubmitList)) {
+            return questionSubmitVOPage;
+        }
+        // 1. 关联查询用户信息
+        User loginUserNew = userService.getById(loginUser.getId()); // 修改此处
+        // 2. 关联查询题目信息
+        Set<Long> questionIdSet = questionSubmitList.stream().map(QuestionSubmit::getQuestionId).collect(Collectors.toSet());
+        Map<Long, List<Question>> questionIdQuestionListMap = questionService.listByIds(questionIdSet).stream()
+                .collect(Collectors.groupingBy(Question::getId));
+        // 填充信息
+        List<MyQuestionSubmitVO> questionSubmitVOList = questionSubmitList.stream()
+                .limit(5)
+                .map(questionSubmit -> {
+                    MyQuestionSubmitVO myQuestionSubmitVO = new MyQuestionSubmitVO();
+                    Long questionId = questionSubmit.getQuestionId();
+                    Question question = null;
+                    if (questionIdQuestionListMap.containsKey(questionId)) {
+                        question = questionIdQuestionListMap.get(questionId).get(0);
+                    }
+                    myQuestionSubmitVO.setTitle(question.getTitle());
+                    myQuestionSubmitVO.setCreateTime(questionSubmit.getCreateTime());
+                    myQuestionSubmitVO.setStatus(questionSubmit.getStatus());
+                    myQuestionSubmitVO.setLanguage(questionSubmit.getLanguage());
+                    myQuestionSubmitVO.setId(questionSubmit.getQuestionId());
+                    return myQuestionSubmitVO;
+                }).collect(Collectors.toList());
+        questionSubmitVOPage.setRecords(questionSubmitVOList);
+        return questionSubmitVOPage;
+    }
 
 }
 

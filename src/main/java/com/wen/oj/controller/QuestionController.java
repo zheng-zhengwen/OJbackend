@@ -20,8 +20,7 @@ import com.wen.oj.model.entity.Question;
 import com.wen.oj.model.entity.QuestionSubmit;
 import com.wen.oj.model.entity.User;
 import com.wen.oj.model.enums.QuestionsSubmitLanguageEnum;
-import com.wen.oj.model.vo.QuestionSubmitVO;
-import com.wen.oj.model.vo.QuestionVO;
+import com.wen.oj.model.vo.*;
 import com.wen.oj.service.QuestionService;
 import com.wen.oj.service.QuestionSubmitService;
 import com.wen.oj.service.UserService;
@@ -57,6 +56,10 @@ public class QuestionController {
 
     @Resource
     private AiManager aiManager;
+
+
+    @Resource
+    private QuestionSubmitService questionSubmitService;
 
 //    @Resource
 //    private static final String CACHE_KEY_PREFIX = "question:ai:";
@@ -394,4 +397,56 @@ public class QuestionController {
         AiQuestionVO aiQuestionVO = aiManager.getGenResultByDeepSeek(question.getTitle(), question.getContent(), questionSubmitQueryDTO.getLanguage(), question.getId());
         return ResultUtils.success(aiQuestionVO);
     }
+
+    /**
+     * 排行
+     * */
+    @GetMapping("/leaderboard")
+    public BaseResponse<List<UserLeaderboardVO>> getLeaderboard() {
+        List<UserLeaderboardVO> leaderboardVOS=  questionSubmitService.getLeaderboard();
+        return ResultUtils.success(leaderboardVOS);
+    }
+
+    /**
+     * 分页获取题目提交列表（用户自己）
+     *
+     * @param questionSubmitQueryRequest
+     * @return
+     */
+    @PostMapping("/question_submit/list/page/my")
+    public BaseResponse<Page<MyQuestionSubmitVO>> listQuestionMySubmitByPage(@RequestBody QuestionSubmitQueryRequest questionSubmitQueryRequest, HttpServletRequest request) {
+        long current = questionSubmitQueryRequest.getCurrent();
+        long size = questionSubmitQueryRequest.getPageSize();
+        User loginUser = userService.getLoginUser(request);
+        questionSubmitQueryRequest.setUserId(loginUser.getId());
+        Page<QuestionSubmit> questionSubmitPage = questionSubmitService.page(new Page<>(current, size),
+                questionSubmitService.getQueryWrapper(questionSubmitQueryRequest));
+        return ResultUtils.success(questionSubmitService.getMyQuestionSubmitVOPage(questionSubmitPage, loginUser));
+    }
+
+    /**
+     * 返回近日热题列表
+     * @param questionQueryRequest
+     * @param request
+     * @return
+     */
+    @PostMapping("/hot/list")
+    public BaseResponse<Page<HotQuestionVO>> getHotQuestionSubmitList(@RequestBody QuestionQueryRequest questionQueryRequest,HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        questionQueryRequest.setUserId(loginUser.getId());
+        Page<HotQuestionVO> questionVOPage=  questionService.listHotQuestions(questionQueryRequest);
+        return ResultUtils.success(questionVOPage);
+    }
+    /**
+     * 统计个人数据
+     * @param request
+     * @return
+     */
+    @GetMapping("/status")
+    public BaseResponse<UserStatsVO> getUserStats(HttpServletRequest request) {
+        User loginUser = userService.getLoginUser(request);
+        UserStatsVO userStatsVO=  questionSubmitService.getUserStats(loginUser.getId());
+        return ResultUtils.success(userStatsVO);
+    }
+
 }
