@@ -112,3 +112,10 @@ ark:
   read-timeout: 45000
 ai:
   apiKey: 41ac7a76-ce1e-4fb5-a372-23b9cbef5a73
+
+file:
+  minio:
+    endpoint: http://127.0.0.1:9000 #ip地址
+    accessKey: minioadmin #  账号
+    secretKey: minioadmin #  密码
+    bucket: "bisheoj"  # 桶的名字 相当于文件夹
