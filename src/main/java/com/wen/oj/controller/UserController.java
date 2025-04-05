@@ -1,5 +1,6 @@
 package com.wen.oj.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.wen.oj.AI.QuestionSubmitQueryDTO;
 import com.wen.oj.annotation.AuthCheck;
@@ -468,8 +469,12 @@ public class UserController {
             questionSubmitQueryDTO.setQuestionId(questionId);
         }
 
+
         // 将 QuestionSubmitQueryDTO 转换为 QuestionSubmitQueryRequest
         QuestionSubmitQueryRequest questionSubmitQueryRequest = convertToQueryRequest(questionSubmitQueryDTO);
+
+        QueryWrapper<QuestionSubmit> queryWrapper = questionSubmitService.getQueryWrapper(questionSubmitQueryRequest);
+        System.out.println("构建的查询条件：" + queryWrapper.getSqlSegment());
 
         // 直接调用本地服务方法获取题目提交记录
         List<QuestionSubmit> questionSubmitList = questionSubmitService.list(questionSubmitService.getQueryWrapper(questionSubmitQueryRequest));
@@ -479,9 +484,19 @@ public class UserController {
                 .peek(questionSubmitVO -> {
                     Long questionSubmitId = questionSubmitVO.getQuestionId();
                     // 直接调用本地服务方法获取题目信息
-                    Question question = questionService.getById(questionSubmitId);
-                    QuestionVO questionVO = questionService.getQuestionVO(question, user);
-                    questionSubmitVO.setQuestionVO(questionVO);
+//                    Question question = questionService.getById(questionSubmitId);
+//                    QuestionVO questionVO = questionService.getQuestionVO(question, user);
+//                    questionSubmitVO.setQuestionVO(questionVO);
+
+                    try {
+                        Question question = questionService.getById(questionSubmitId);
+                        QuestionVO questionVO = questionService.getQuestionVO(question, user);
+                        questionSubmitVO.setQuestionVO(questionVO);
+
+                    } catch (Exception e) {
+                        log.error("获取题目信息失败，题目 ID：" + questionSubmitId, e);
+                        throw new BusinessException(ErrorCode.SYSTEM_ERROR, "获取题目信息失败");
+                    }
                 })
                 .collect(Collectors.toList());
 
