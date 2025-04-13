@@ -2,17 +2,20 @@ package com.wen.oj.controller;
 
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.wen.oj.AI.QuestionSubmitQueryDTO;
+import com.qcloud.cos.model.PutObjectResult;
+import com.wen.oj.model.dto.questionsubmit.QuestionSubmitQueryDTO;
 import com.wen.oj.annotation.AuthCheck;
 import com.wen.oj.common.BaseResponse;
 import com.wen.oj.common.DeleteRequest;
 import com.wen.oj.common.ErrorCode;
 import com.wen.oj.common.ResultUtils;
+import com.wen.oj.config.CosClientConfig;
 import com.wen.oj.config.MinioConfiguration;
 import com.wen.oj.config.WxOpenConfig;
 import com.wen.oj.constant.UserConstant;
 import com.wen.oj.exception.BusinessException;
 import com.wen.oj.exception.ThrowUtils;
+import com.wen.oj.manager.CosManager;
 import com.wen.oj.model.dto.questionsubmit.QuestionSubmitQueryRequest;
 import com.wen.oj.model.dto.user.UserAddRequest;
 import com.wen.oj.model.dto.user.UserLoginRequest;
@@ -28,6 +31,10 @@ import com.wen.oj.service.QuestionService;
 import com.wen.oj.service.QuestionSubmitService;
 import com.wen.oj.service.UserService;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -36,19 +43,14 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import io.minio.MinioClient;
-import io.minio.PutObjectArgs;
-import io.minio.RemoveObjectArgs;
 import lombok.extern.slf4j.Slf4j;
 import me.chanjar.weixin.common.bean.WxOAuth2UserInfo;
 import me.chanjar.weixin.common.bean.oauth2.WxOAuth2AccessToken;
 import me.chanjar.weixin.mp.api.WxMpService;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
-import org.springframework.util.DigestUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import static com.wen.oj.service.impl.UserServiceImpl.SALT;
 
 /**
  * 用户接口
@@ -78,8 +80,15 @@ public class UserController {
     @Resource
     private MinioConfiguration minioConfiguration;
 
+    @Resource
+    private CosManager cosManager;
 
-    //头像文件
+    @Resource
+    private CosClientConfig cosClientConfig;
+
+    /**
+     *腾讯云 COS 客户端(上传头像)
+     * */
     @PostMapping("/upload/avatar")
     public BaseResponse<String> uploadAvatar(@RequestParam("file") MultipartFile file, @RequestParam("userId") Long userId) {
         try {
@@ -97,50 +106,35 @@ public class UserController {
 
             // 生成文件名：userId_timestamp.extension
             String extension = getFileExtension(file.getOriginalFilename());
-            String fileName = String.format("avatar/%s_%s%s", userId, System.currentTimeMillis(), ".jpg");
+            String fileName = String.format("avatar/%s_%s%s", userId, System.currentTimeMillis(), extension);
 
-            // 上传到 MinIO
-            minioClient.putObject(
-                    PutObjectArgs.builder()
-                            .bucket(minioConfiguration.getBucket())  // MinIO bucket 名称
-                            .object(fileName)       // 文件名
-                            .stream(file.getInputStream(), file.getSize(), -1)
-                            .contentType(contentType)
-                            .build()
-            );
+            // 创建临时文件
+            File tempFile = File.createTempFile("temp-avatar", extension);
+            Files.copy(file.getInputStream(), tempFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+
+            // 上传到COS
+            PutObjectResult result = cosManager.putObject(fileName, tempFile);
+
+            // 删除临时文件
+            tempFile.delete();
+
             // 获取文件访问URL
-            String avatarUrl = String.format("%s/%s/%s",minioConfiguration.getEndpoint(),minioConfiguration.getBucket(),fileName);
+            String avatarUrl = "https://" + cosClientConfig.getBucket() + ".cos." + cosClientConfig.getRegion() + ".myqcloud.com/" + fileName;
+
             // 更新用户头像URL
             User user = userService.getById(userId);
             if (user != null) {
-                // 删除旧头像文件（如果存在）
-                String oldAvatarUrl = user.getUserAvatar();
-                if (StringUtils.isNotBlank(oldAvatarUrl)) {
-                    try {
-                        String oldFileName = extractFilePathFromUrl(oldAvatarUrl);
-                        minioClient.removeObject(
-                                RemoveObjectArgs.builder()
-                                        .bucket(minioConfiguration.getBucket())
-                                        .object(oldFileName)
-                                        .build()
-                        );
-                    } catch (Exception e) {
-                        // 记录日志但不影响新文件上传
-                        log.error("删除旧头像文件失败", e);
-                    }
-                }
                 user.setUserAvatar(avatarUrl);
                 userService.updateById(user);
             }
             return ResultUtils.success(avatarUrl);
         } catch (BusinessException e) {
             throw e;
-        } catch (Exception e) {
+        } catch (IOException e) {
             log.error("文件上传失败", e);
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "文件上传失败");
         }
     }
-
 
     private String getFileExtension(String filename) {
         return Optional.ofNullable(filename)
@@ -149,27 +143,97 @@ public class UserController {
                 .orElse("");
     }
 
-    /**
-     * 从URL中提取文件路径
-     * 例如：从 http://192.168.0.116:9000/wen/avatar/xxx.jpg 提取出 avatar/xxx.jpg
-     */
-    private String extractFilePathFromUrl(String url) {
-        try {
-            if (StringUtils.isBlank(url)) {
-                return null;
-            }
-            // 查找最后一个斜杠之前的 "wen/" 位置
-            int bucketIndex = url.lastIndexOf(minioConfiguration.getBucket() + "/");
-            if (bucketIndex != -1) {
-                // 返回 bucket 名称后的路径部分
-                return url.substring(bucketIndex + minioConfiguration.getBucket().length() + 1);
-            }
-            return null;
-        } catch (Exception e) {
-            log.error("提取文件路径失败, url: {}", url, e);
-            return null;
-        }
-    }
+//    //头像文件
+//    @PostMapping("/upload/avatar")
+//    public BaseResponse<String> uploadAvatar(@RequestParam("file") MultipartFile file, @RequestParam("userId") Long userId) {
+//        try {
+//            // 校验文件类型
+//            String contentType = file.getContentType();
+//            if (contentType != null && !contentType.startsWith("image/")) {
+//                throw new BusinessException(ErrorCode.PARAMS_ERROR, "只能上传图片文件");
+//            }
+//
+//            // 校验文件大小（例如最大 2MB）
+//            long maxSize = 2 * 1024 * 1024;
+//            if (file.getSize() > maxSize) {
+//                throw new BusinessException(ErrorCode.PARAMS_ERROR, "文件大小不能超过 2MB");
+//            }
+//
+//            // 生成文件名：userId_timestamp.extension
+//            String extension = getFileExtension(file.getOriginalFilename());
+//            String fileName = String.format("avatar/%s_%s%s", userId, System.currentTimeMillis(), ".jpg");
+//
+//            // 上传到 MinIO
+//            minioClient.putObject(
+//                    PutObjectArgs.builder()
+//                            .bucket(minioConfiguration.getBucket())  // MinIO bucket 名称
+//                            .object(fileName)       // 文件名
+//                            .stream(file.getInputStream(), file.getSize(), -1)
+//                            .contentType(contentType)
+//                            .build()
+//            );
+//            // 获取文件访问URL
+//            String avatarUrl = String.format("%s/%s/%s",minioConfiguration.getEndpoint(),minioConfiguration.getBucket(),fileName);
+//            // 更新用户头像URL
+//            User user = userService.getById(userId);
+//            if (user != null) {
+//                // 删除旧头像文件（如果存在）
+//                String oldAvatarUrl = user.getUserAvatar();
+//                if (StringUtils.isNotBlank(oldAvatarUrl)) {
+//                    try {
+//                        String oldFileName = extractFilePathFromUrl(oldAvatarUrl);
+//                        minioClient.removeObject(
+//                                RemoveObjectArgs.builder()
+//                                        .bucket(minioConfiguration.getBucket())
+//                                        .object(oldFileName)
+//                                        .build()
+//                        );
+//                    } catch (Exception e) {
+//                        // 记录日志但不影响新文件上传
+//                        log.error("删除旧头像文件失败", e);
+//                    }
+//                }
+//                user.setUserAvatar(avatarUrl);
+//                userService.updateById(user);
+//            }
+//            return ResultUtils.success(avatarUrl);
+//        } catch (BusinessException e) {
+//            throw e;
+//        } catch (Exception e) {
+//            log.error("文件上传失败", e);
+//            throw new BusinessException(ErrorCode.OPERATION_ERROR, "文件上传失败");
+//        }
+//    }
+//
+//
+//    private String getFileExtension(String filename) {
+//        return Optional.ofNullable(filename)
+//                .filter(f -> f.contains("."))
+//                .map(f -> f.substring(f.lastIndexOf(".")))
+//                .orElse("");
+//    }
+//
+//    /**
+//     * 从URL中提取文件路径
+//     * 例如：从 http://192.168.0.116:9000/wen/avatar/xxx.jpg 提取出 avatar/xxx.jpg
+//     */
+//    private String extractFilePathFromUrl(String url) {
+//        try {
+//            if (StringUtils.isBlank(url)) {
+//                return null;
+//            }
+//            // 查找最后一个斜杠之前的 "wen/" 位置
+//            int bucketIndex = url.lastIndexOf(minioConfiguration.getBucket() + "/");
+//            if (bucketIndex != -1) {
+//                // 返回 bucket 名称后的路径部分
+//                return url.substring(bucketIndex + minioConfiguration.getBucket().length() + 1);
+//            }
+//            return null;
+//        } catch (Exception e) {
+//            log.error("提取文件路径失败, url: {}", url, e);
+//            return null;
+//        }
+//    }
 
     // region 登录相关
 
@@ -322,6 +386,7 @@ public class UserController {
      */
     @GetMapping("/get")
     @AuthCheck(mustRole = UserConstant.USER_LOGIN_STATE)
+//    @AuthCheck(anyRole = {UserConstant.ADMIN_ROLE, UserConstant.USER_LOGIN_STATE})
     public BaseResponse<User> getUserById(long id, HttpServletRequest request) {
         if (id <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);

@@ -1,4 +1,4 @@
-package com.wen.oj.AI;
+package com.wen.oj.model.dto.questionsubmit;
 
 import lombok.Data;
 

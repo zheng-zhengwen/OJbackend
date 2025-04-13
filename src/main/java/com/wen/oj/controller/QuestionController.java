@@ -4,7 +4,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.google.gson.Gson;
 import com.wen.oj.AI.AiManager;
 import com.wen.oj.AI.AiQuestionVO;
-import com.wen.oj.AI.QuestionSubmitQueryDTO;
+import com.wen.oj.model.dto.questionsubmit.QuestionSubmitQueryDTO;
 import com.wen.oj.annotation.AuthCheck;
 import com.wen.oj.common.BaseResponse;
 import com.wen.oj.common.DeleteRequest;
@@ -26,11 +26,15 @@ import com.wen.oj.service.QuestionSubmitService;
 import com.wen.oj.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.web.bind.annotation.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 题目接口
@@ -61,11 +65,10 @@ public class QuestionController {
     @Resource
     private QuestionSubmitService questionSubmitService;
 
-//    @Resource
-//    private static final String CACHE_KEY_PREFIX = "question:ai:";
+    private static final String CACHE_KEY_PREFIX = "question:ai:";
 
-//    @Resource
-//    private RedisTemplate<String, Object> redisTemplate;
+    @Resource
+    private RedisTemplate<String, Object> redisTemplate;
 
     // region 增删改查
 
@@ -140,7 +143,10 @@ public class QuestionController {
     @PostMapping("/update")
     @AuthCheck(mustRole = UserConstant.ADMIN_ROLE)
     public BaseResponse<Boolean> updateQuestion(@RequestBody QuestionUpdateRequest questionUpdateRequest) {
+        Logger logger = LoggerFactory.getLogger(QuestionController.class);
+        System.out.println("更新题目1111="+logger);
         if (questionUpdateRequest == null || questionUpdateRequest.getId() <= 0) {
+            logger.error("更新题目请求参数错误，请求参数: {}", questionUpdateRequest);
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         Question question = new Question();
@@ -162,8 +168,16 @@ public class QuestionController {
         long id = questionUpdateRequest.getId();
         // 判断是否存在
         Question oldQuestion = questionService.getById(id);
-        ThrowUtils.throwIf(oldQuestion == null, ErrorCode.NOT_FOUND_ERROR);
+        if (oldQuestion == null) {
+            logger.error("要更新的题目不存在，题目ID: {}", id);
+            ThrowUtils.throwIf(true, ErrorCode.NOT_FOUND_ERROR);
+        }
         boolean result = questionService.updateById(question);
+        if (result) {
+            logger.info("题目更新成功，题目ID: {}", id);
+        } else {
+            logger.error("题目更新失败，题目ID: {}", id);
+        }
         return ResultUtils.success(result);
     }
 
@@ -184,7 +198,7 @@ public class QuestionController {
         }
         User loginUser = userService.getLoginUser(request);
         //不是本人/管理员，则脱敏
-        if (!question.getUserId().equals(loginUser.getId()) && userService.isAdmin(loginUser)) {
+        if (!question.getUserId().equals(loginUser.getId()) && !userService.isAdmin(loginUser)) {
             throw new BusinessException(ErrorCode.NO_AUTH_ERROR);
         }
         return ResultUtils.success(question);
@@ -280,6 +294,7 @@ public class QuestionController {
      */
     @PostMapping("/edit")
     public BaseResponse<Boolean> editQuestion(@RequestBody QuestionEditRequest questionEditRequest, HttpServletRequest request) {
+        log.debug("净来了");
         if (questionEditRequest == null || questionEditRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
@@ -378,24 +393,25 @@ public class QuestionController {
         if (question == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
         }
-//        //定义缓存键
-//        String cacheKey = CACHE_KEY_PREFIX + question.getId()+questionSubmitQueryDTO.getLanguage();
-//        // 尝试从Redis中获取缓存
-//        AiQuestionVO cachedAiQuestionVO = (AiQuestionVO) redisTemplate.opsForValue().get(cacheKey);
-//        if (cachedAiQuestionVO != null) {
-//            // 如果缓存存在，直接返回
-//            return ResultUtils.success(cachedAiQuestionVO);
-//        } else {
-//            // 如果缓存不存在，调用AI方法获取结果
-//            AiQuestionVO aiQuestionVO = aiManager.getGenResultByDeepSeek(question.getTitle(), question.getContent(), questionSubmitQueryDTO.getLanguage(), question.getId());
-//
-//            // 将结果存入Redis并设置过期时间为一天
+        //定义缓存键
+        String cacheKey = CACHE_KEY_PREFIX + question.getId()+questionSubmitQueryDTO.getLanguage();
+        // 尝试从Redis中获取缓存
+        AiQuestionVO cachedAiQuestionVO = (AiQuestionVO) redisTemplate.opsForValue().get(cacheKey);
+        if (cachedAiQuestionVO != null) {
+            // 如果缓存存在，直接返回
+            return ResultUtils.success(cachedAiQuestionVO);
+        } else {
+            // 如果缓存不存在，调用AI方法获取结果
+            AiQuestionVO aiQuestionVO = aiManager.getGenResultByDeepSeek(question.getTitle(), question.getContent(), questionSubmitQueryDTO.getLanguage(), question.getId());
+
+            // 将结果存入Redis并设置过期时间为一小时//一天
 //            redisTemplate.opsForValue().set(cacheKey, aiQuestionVO, 1, TimeUnit.HOURS);
-//
-//            return ResultUtils.success(aiQuestionVO);
-//        }
-        AiQuestionVO aiQuestionVO = aiManager.getGenResultByDeepSeek(question.getTitle(), question.getContent(), questionSubmitQueryDTO.getLanguage(), question.getId());
-        return ResultUtils.success(aiQuestionVO);
+            redisTemplate.opsForValue().set(cacheKey, aiQuestionVO, 1, TimeUnit.DAYS);
+
+            return ResultUtils.success(aiQuestionVO);
+        }
+//        AiQuestionVO aiQuestionVO = aiManager.getGenResultByDeepSeek(question.getTitle(), question.getContent(), questionSubmitQueryDTO.getLanguage(), question.getId());
+//        return ResultUtils.success(aiQuestionVO);
     }
 
     /**

@@ -8,6 +8,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.wen.oj.common.ErrorCode;
 import com.wen.oj.constant.CommonConstant;
+import com.wen.oj.constant.UserConstant;
 import com.wen.oj.exception.BusinessException;
 import com.wen.oj.judge.JudgeService;
 import com.wen.oj.mapper.QuestionMapper;
@@ -156,6 +157,7 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
     @Override
     public QuestionSubmitVO getQuestionSubmitVO(QuestionSubmit questionSubmit, User loginUser) {
         QuestionSubmitVO questionSubmitVO = QuestionSubmitVO.objToVo(questionSubmit);
+        /**
         //脱敏：仅管理员和本用户能看到自己（提交userId 和 登录用户 id 不同）提交代码）
 //        long userId = loginUser.getId();
 //        //处理脱敏
@@ -163,11 +165,12 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
 //            questionSubmitVO.setCode(null);
 //        }
 //        return questionSubmitVO;
-        // 只有本人和管理员才能看见提交的代码
+         */
+        //只有本人和管理员才能看见提交的代码
         Long userId1 = loginUser.getId();
         // 1. 关联查询用户信息
         Long userId = questionSubmitVO.getUserId();
-        if (!userId1.equals(userId) && !isAdmin(loginUser)) {
+        if (!isAdmin(loginUser) && !userId1.equals(userId)) {
             questionSubmitVO.setCode(null);
         }
         if (userId != null && userId > 0) {
@@ -187,7 +190,8 @@ public class QuestionSubmitServiceImpl extends ServiceImpl<QuestionSubmitMapper,
 
     // 判断是否为管理员
     private boolean isAdmin(User user) {
-        return user != null && "ADMIN".equals(user.getUserRole()); // 假设管理员角色为 "ADMIN"
+//        return user != null && "ADMIN".equals(user.getUserRole()); // 管理员角色为 "ADMIN"
+        return user != null && UserConstant.ADMIN_ROLE.equals(user.getUserRole());
     }
 
     // 获取脱敏的用户信息

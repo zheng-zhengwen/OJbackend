@@ -15,13 +15,13 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  * @author <a href="https://github.com/zheng-zhengwen">程序员阿文</a>
  * @from <a href="https://wen.icu">在线编程系统</a>
  */
-// todo 如需开启 Redis，须移除 exclude 中的内容
-@SpringBootApplication(exclude = {RedisAutoConfiguration.class})
+// todo 如需开启 Redis，须移除 exclude 中的内容  (exclude = {RedisAutoConfiguration.class})
+@SpringBootApplication
 @MapperScan("com.wen.oj.mapper")
 @EnableScheduling
 @EnableAspectJAutoProxy(proxyTargetClass = true, exposeProxy = true)
 @EnableDiscoveryClient
-@EnableFeignClients(basePackages = "com.wen.oj.service.AI")
+@EnableFeignClients(basePackages = "com.wen.oj.AI")
 public class MainApplication {
 
     public static void main(String[] args) {
