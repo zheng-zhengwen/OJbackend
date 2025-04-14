@@ -16,11 +16,12 @@ public enum QuestionsSubmitLanguageEnum {
 
     JAVA("java", "java"),
     CPLUSPLUS("c++", "cpp"),
-    GOLANG("go", "golang");
+    PYTHON("python", "python");
 
     private final String text;
 
     private final String value;
+
 
     QuestionsSubmitLanguageEnum(String text, String value) {
         this.text = text;

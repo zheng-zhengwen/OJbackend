@@ -1,6 +1,7 @@
 package com.wen.oj.judge.strategy;
 
 import cn.hutool.json.JSONUtil;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.wen.oj.model.dto.question.JudgeCase;
 import com.wen.oj.model.dto.question.JudgeConfig;
 import com.wen.oj.judge.codesandbox.model.JudgeInfo;
@@ -38,11 +39,35 @@ public class JavaLanguageJudgeStrategy implements JudgeStrategy {
             judgeInfoResponse.setMessage(judgeInfoMessageEnum.getValue());
             return judgeInfoResponse;
         }
-        //判断每一项输出和预期输出是否相等
-        for(int i=0;i<judgeCaseList.size();i++){
+//        //判断每一项输出和预期输出是否相等
+//        for(int i=0;i<judgeCaseList.size();i++){
+//            JudgeCase judgeCase = judgeCaseList.get(i);
+//            if(!judgeCase.getOutput().equals(outputList.get(i))){
+//                judgeInfoMessageEnum=JudgeInfoMessageEnum.WRONG_ANSWER;
+//                judgeInfoResponse.setMessage(judgeInfoMessageEnum.getValue());
+//                return judgeInfoResponse;
+//            }
+//        }
+        //使用json解析，判断每一项输出和预期输出是否相等（增强版本）
+        ObjectMapper objectMapper = new ObjectMapper();
+        for (int i = 0; i < judgeCaseList.size(); i++) {
             JudgeCase judgeCase = judgeCaseList.get(i);
-            if(!judgeCase.getOutput().equals(outputList.get(i))){
-                judgeInfoMessageEnum=JudgeInfoMessageEnum.WRONG_ANSWER;
+            try {
+                // 统一分隔符为空格
+                String expectedOutputStr = judgeCase.getOutput().replaceAll("[,，]", " ");
+                String actualOutputStr = outputList.get(i).replaceAll("[,，]", " ");
+
+                Object expectedOutputObj = objectMapper.readValue(expectedOutputStr, Object.class);
+                Object actualOutputObj = objectMapper.readValue(actualOutputStr, Object.class);
+
+                if (!expectedOutputObj.equals(actualOutputObj)) {
+                    judgeInfoMessageEnum = JudgeInfoMessageEnum.WRONG_ANSWER;
+                    judgeInfoResponse.setMessage(judgeInfoMessageEnum.getValue());
+                    return judgeInfoResponse;
+                }
+            } catch (Exception e) {
+                // 解析失败，按错误处理
+                judgeInfoMessageEnum = JudgeInfoMessageEnum.WRONG_ANSWER;
                 judgeInfoResponse.setMessage(judgeInfoMessageEnum.getValue());
                 return judgeInfoResponse;
             }
@@ -57,7 +82,7 @@ public class JavaLanguageJudgeStrategy implements JudgeStrategy {
             judgeInfoResponse.setMessage(judgeInfoMessageEnum.getValue());
             return judgeInfoResponse;
         }
-        //Java程序本身需要额外执行10秒钟
+        //Java程序本身需要额外执行1秒钟
         long JAVA_PROGRAM_TIME_COST=1000L;
         if((time - JAVA_PROGRAM_TIME_COST) >needTimeLimit){
             judgeInfoMessageEnum=JudgeInfoMessageEnum.TIME_LIMIT_EXCEEDED;

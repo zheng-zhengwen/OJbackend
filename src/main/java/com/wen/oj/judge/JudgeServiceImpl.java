@@ -24,7 +24,7 @@ import javax.annotation.Resource;
 import java.util.List;
 import java.util.stream.Collectors;
 
-@Service
+@Service //和@Component功能一样，都是将类交给spring管理，但是@Service是专门用来管理service层的
 class JudgeServiceImpl implements JudgeService {
     @Resource
     private QuestionService questionService;
@@ -32,12 +32,12 @@ class JudgeServiceImpl implements JudgeService {
     private QuestionSubmitService questionSubmitService;
     @Resource
     private JudgeManager judgeManager;
-    @Value("${codesandbox.type:example}")
+    @Value("${codesandbox.type:remote}")
     private String type;
 
     @Override
     public QuestionSubmit dojudge(long questionSubmitId) {
-        //1）传入题目的提交id,获取到对应的题目，提交信息（包含代码，编程语言等）
+        //1）传入题目的提交 id，获取到对应的题目，提交信息（包含代码，编程语言等）
         //2）如果题目提交状态不为等待中，就不用重复执行了，只执行等待中的题目
         //3）更改题目提交状态为“判题中”，防止重复执行，也能让用户即时看到状态
         //传入提交的id，获取对应的题目信息
@@ -50,11 +50,11 @@ class JudgeServiceImpl implements JudgeService {
         if (question == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "题目不存在");
         }
-        //如果不为等待状态，抛出异常
+        //如果不为待判题状态，抛出异常
         if (!questionSubmit.getStatus().equals(QuestionSubmitStatusEnum.WAITING.getValue())) {
             throw new BusinessException(ErrorCode.OPERATION_ERROR, "题目正在判题中");
         }
-        //更改题目状态为"判题中"，防止重复执行
+        //更改题目状态为"判题中"，防止重复执行，也能让用户即时看到状态
         QuestionSubmit questionSubmitUpdate = new QuestionSubmit();
         questionSubmitUpdate.setId(questionSubmitId);
         questionSubmitUpdate.setStatus(QuestionSubmitStatusEnum.RUNNING.getValue());
@@ -62,11 +62,13 @@ class JudgeServiceImpl implements JudgeService {
         if (!update) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "题目状态更新错误");
         }
-        //调用代码沙箱，获取执行结果
+
+        //调用指定代码沙箱，获取执行结果
         CodeSandbox codeSandbox = CodeSandboxFactory.newInstance(type);
         codeSandbox = new CodeSandboxProxy(codeSandbox);
         String language = questionSubmit.getLanguage();
         String code = questionSubmit.getCode();
+
         //获取输入用例
         String judgeCaseStr = question.getJudgeCase();
         List<JudgeCase> judgeCaseList = JSONUtil.toList(judgeCaseStr, JudgeCase.class);
@@ -77,10 +79,13 @@ class JudgeServiceImpl implements JudgeService {
                 .inputList(inputList)
                 .build();
         ExecuteCodeResponse executeCodeResponse = codeSandbox.executeCode(executeCodeRequest);
+        System.out.println("获得executeCodeResponse："+executeCodeResponse);
         List<String> outputList = executeCodeResponse.getOutputList();
+        System.out.println("获得outputList："+outputList);
         //根据沙箱的执行结果，设置题目的判题状态和信息
         JudgeContext judgeContext = new JudgeContext();
         judgeContext.setJudgeInfo(executeCodeResponse.getJudgeInfo());
+        System.out.println("获得judgeContext："+judgeContext);
         judgeContext.setInputList(inputList);
         judgeContext.setOutputList(outputList);
         judgeContext.setJudgeCaseList(judgeCaseList);
@@ -88,6 +93,7 @@ class JudgeServiceImpl implements JudgeService {
         judgeContext.setQuestionSubmit(questionSubmit);
 
         JudgeInfo judgeInfo = judgeManager.doJudge(judgeContext);
+        System.out.println("获得judgeInfo："+judgeInfo);
         // 修改数据库中的判题结果
         questionSubmitUpdate = new QuestionSubmit();
         questionSubmitUpdate.setId(questionSubmitId);
